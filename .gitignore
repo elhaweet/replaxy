@@ -1,0 +1,11 @@
+.env
+.DS_Store
+__pycache__
+.idea
+KMS
+livekit.toml
+.venv
+.vscode
+*.egg-info
+.pytest_cache
+.ruff_cache

@@ -1,0 +1,14 @@
+# LiveKit Cloud Project Configuration
+# Copy this file to livekit.toml and fill in your project details
+# Get these values from your LiveKit Cloud dashboard: https://cloud.livekit.io/
+
+[project]
+  # Your LiveKit Cloud project subdomain
+  # Example: "my-project" for wss://my-project.livekit.cloud
+  subdomain = "your-project-subdomain"
+
+[agent]
+  # Your agent ID from LiveKit Cloud
+  # This is created when you deploy your first agent
+  # Example: "CA_xxxxxxxxxxxxx"
+  id = "your-agent-id-here"
