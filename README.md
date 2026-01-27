@@ -2,6 +2,10 @@
 
 Multi-agent voice AI built with [LiveKit Agents](https://github.com/livekit/agents). **Tom** (starter) hands off to **Sarah** (support) or **James** (booking); both can return to Tom or end the call. The `replaxy` agent uses **explicit dispatch** — it must be dispatched to a room (CLI, API, token, or SIP) and does not auto-join by room name.
 
+## Tutorial
+
+[![Replaxy Tutorial](https://img.youtube.com/vi/3FnatxfYt_k/maxresdefault.jpg)](https://youtu.be/3FnatxfYt_k)
+
 ---
 
 ## Prerequisites
