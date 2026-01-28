@@ -22,7 +22,7 @@ Multi-agent voice AI built with [LiveKit Agents](https://github.com/livekit/agen
 uv sync
 ```
 
-Copy `.env.example` to `.env` and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`. Optionally:
+Copy `.env.example` to `.env` and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`. For booking/calendar integration via Zapier MCP, optionally set `MCP_SERVER_URL` (e.g. `https://mcp.zapier.com/api/v1/connect?token=YOUR_TOKEN`). Optionally:
 
 ```bash
 lk cloud auth
