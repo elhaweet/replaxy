@@ -32,6 +32,9 @@ load_dotenv(".env")  # Fall back to .env if .env.local doesn't exist
 # Format: https://mcp.zapier.com/api/v1/connect?token=YOUR_TOKEN
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "").strip()
 
+# Default timezone for bookings when user does not specify. Defaults to UTC; set BOOKING_DEFAULT_TIMEZONE in .env to override.
+BOOKING_DEFAULT_TIMEZONE = (os.environ.get("BOOKING_DEFAULT_TIMEZONE") or "UTC").strip()
+
 # Agent name for explicit dispatch. When set, automatic dispatch is disabled;
 # the agent must be explicitly dispatched via API, CLI, token, or SIP.
 AGENT_NAME = "replaxy"
@@ -43,6 +46,7 @@ class StarterAgent(OrchestratorAgent):
             Only speak in english. Greet the user by saying my name is Tom.
             If the user wants to book an appointment call the tool call_booking_agent to connect to James the booking agent.
             If the user has a technical issue call the tool call_support_agent to connect to Sarah the support agent.
+            When you call call_booking_agent or call_support_agent, say only the transfer message that the tool returns. Do not add follow-up questions like "Anything else I can help with?" because you are leaving the conversation.
             Your responses are concise, to the point, and without any complex formatting or punctuation including emojis, asterisks, or other symbols.
             You are curious, friendly, and have a sense of humor."""
         if job_metadata and job_metadata.get("user_name"):
@@ -175,12 +179,21 @@ class BookingAgent(OrchestratorAgent):
             - Help users check their existing appointments (e.g. list upcoming appointments, see details).
             - Help users book new appointments (e.g. suggest times, confirm booking).
 
+            You complete the booking here using MCP tools. Once the user has given date, time, and appointment type, call the MCP tools to check availability and create the booking. Do not say you are transferring the user back to Tom to complete the booking; Tom cannot book appointments. Never say "I will transfer you back to Tom to complete the booking" or that Tom will complete the booking. You complete the booking; then you may offer to transfer back to Tom.
+
+            If the requested slot is occupied or a booking attempt fails because the slot is taken, tell the user that slot is occupied. Do not transfer them back to Tom. Use MCP tools to find another available slot on the same day, suggest it to the user, and if they agree, book it. If that slot is also taken or the user declines, keep searching and suggesting other free slots the same day until one is booked or the user asks for another day or to go back to Tom. Only after a successful booking, or if the user explicitly asks to talk to Tom or try another day, offer to transfer back to Tom.
+
+            Before creating any appointment, you must check availability for the requested date and time using MCP tools (e.g. list events in that time range or get free/busy). If the check shows the slot is already occupied, do not create an event; tell the user the slot is occupied and use MCP tools to find another free slot the same day and suggest it. Only when the availability check shows the slot is free should you call the MCP tool that creates the event. Never call only a "create event" or "quick add" tool without checking availability first.
+
+            When calling MCP tools that create a calendar event, always specify the timezone for the event (e.g. via a timezone parameter if the tool has one, or by passing start and end in ISO 8601 with offset, e.g. 2026-02-01T15:00:00+02:00 for 3 PM in Israel). Do not send naive times like 2026-02-01T15:00:00 without timezone or offset.
+            """ + (f" When the user does not specify a timezone, use {BOOKING_DEFAULT_TIMEZONE} for creating events." if BOOKING_DEFAULT_TIMEZONE else " If the user has not specified a timezone, use a sensible default (e.g. Asia/Jerusalem if the user is in Israel) or ask the user which timezone to use.") + """ You can use the get_current_time or convert_time tools to resolve times like "3 PM" in the user's timezone to an ISO time with offset before passing to the create tool.
+
             You have access to MCP tools from the connected server. Use them whenever the user asks to check or book appointments. Call the appropriate tool with the parameters the user provides (name, date, time, reason, etc.), then summarize the result in short, clear speech.
 
             When the user asks for the time in a city or timezone (e.g. Cairo, New York), or to book in another timezone, use the get_current_time and convert_time tools and state the timezone clearly.
 
-            When the booking was successful, ask the user if they want to talk to Tom again. If they do, call the tool call_starter_agent to transfer them back to Tom.
-            If not end the conversation with the tool end_conversation.
+            After you have successfully created the booking with MCP tools, confirm to the user and state the time in the user's timezone (e.g. "I've booked you for tomorrow at 3 PM Israel time"). Only then ask if they want to talk to Tom again; if yes, call call_starter_agent to transfer them back to Tom. If not, end the conversation with the tool end_conversation.
+
             Your responses are concise, to the point, and without any complex formatting or punctuation including emojis, asterisks, or other symbols.
             Keep responses brief and natural for voice: one or two sentences when possible. Confirm what you did (e.g. "I've booked you for Tuesday at 3 PM") and ask if they need anything else."""
         super().__init__(
@@ -201,6 +214,9 @@ class BookingAgent(OrchestratorAgent):
             timezone_name: IANA timezone name (e.g. America/New_York, Africa/Cairo)
         """
         try:
+            if timezone_name in ("UTC", "Etc/UTC"):
+                now = datetime.now(timezone.utc)
+                return now.strftime("%Y-%m-%d %H:%M:%S UTC")
             tz = ZoneInfo(timezone_name)
             now = datetime.now(tz)
             return now.strftime("%Y-%m-%d %H:%M:%S %Z")
@@ -223,8 +239,8 @@ class BookingAgent(OrchestratorAgent):
             target_timezone: IANA timezone name for the target (e.g. Africa/Cairo)
         """
         try:
-            src_tz = ZoneInfo(source_timezone)
-            tgt_tz = ZoneInfo(target_timezone)
+            src_tz = timezone.utc if source_timezone in ("UTC", "Etc/UTC") else ZoneInfo(source_timezone)
+            tgt_tz = timezone.utc if target_timezone in ("UTC", "Etc/UTC") else ZoneInfo(target_timezone)
             time_str = time_str.strip()
             if " " in time_str:
                 dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M").replace(tzinfo=src_tz)
