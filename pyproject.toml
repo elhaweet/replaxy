@@ -8,6 +8,7 @@ dependencies = [
     "livekit-plugins-noise-cancellation~=0.2",
     "livekit>=1.0.22", # 1.0.21 is yanked (bug in AudioStream); constraint forces a valid version
     "mcp",
+    "mem0ai",
     "python-dotenv",
     "tzdata",
 ]

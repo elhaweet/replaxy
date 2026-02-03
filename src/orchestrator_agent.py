@@ -4,8 +4,10 @@ from typing import Any, Dict, Optional
 
 from livekit.agents import Agent
 from livekit.agents.job import get_job_context
-from livekit.agents.llm import function_tool
+from livekit.agents.llm import ChatContext, ChatMessage, function_tool
 from livekit import api
+
+from memory import mem0_client
 
 logger = logging.getLogger("agent")
 
@@ -107,6 +109,55 @@ class OrchestratorAgent(Agent):
                 "type": "exit"
             }]
         })
+
+    async def on_user_turn_completed(
+        self, turn_ctx: ChatContext, new_message: ChatMessage
+    ) -> None:
+        """Mem0: add user message, search memories, inject RAG context before LLM reply."""
+        if not mem0_client:
+            await super().on_user_turn_completed(turn_ctx, new_message)
+            return
+        session_context = self._get_session_context()
+        mem0_user_id = session_context.get("mem0_user_id")
+        if not mem0_user_id:
+            job_ctx = get_job_context()
+            mem0_user_id = job_ctx.room.name if job_ctx else "unknown"
+        user_text = getattr(new_message, "text_content", None) or ""
+        if not user_text:
+            await super().on_user_turn_completed(turn_ctx, new_message)
+            return
+        try:
+            await mem0_client.add(
+                [{"role": "user", "content": user_text}],
+                user_id=mem0_user_id,
+            )
+        except Exception as e:
+            logger.warning("Mem0 add failed: %s", e)
+        try:
+            # Mem0 v2 search API requires filters (e.g. AND + user_id); passing user_id alone can cause 400
+            filters = {"AND": [{"user_id": mem0_user_id}]}
+            search_results = await mem0_client.search(
+                user_text,
+                filters=filters,
+            )
+        except Exception as e:
+            logger.warning("Mem0 search failed: %s", e)
+            search_results = None
+        if search_results and search_results.get("results"):
+            context_parts = []
+            for result in search_results.get("results", []):
+                paragraph = result.get("memory") or result.get("text")
+                if paragraph:
+                    source = "mem0 Memories"
+                    if "from [" in paragraph:
+                        source = paragraph.split("from [")[1].split("]")[0]
+                        paragraph = paragraph.split("]")[1].strip()
+                    context_parts.append(f"Source: {source}\nContent: {paragraph}\n")
+            if context_parts:
+                full_context = "Relevant memories:\n\n" + "\n\n".join(context_parts)
+                turn_ctx.add_message(role="assistant", content=full_context)
+                await self.update_chat_ctx(turn_ctx)
+        await super().on_user_turn_completed(turn_ctx, new_message)
 
     # ==================== Context and State Management ====================
 
