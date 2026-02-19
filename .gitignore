@@ -9,3 +9,4 @@ livekit.toml
 *.egg-info
 .pytest_cache
 .ruff_cache
+agents.yaml

@@ -22,7 +22,7 @@ Multi-agent voice AI built with [LiveKit Agents](https://github.com/livekit/agen
 uv sync
 ```
 
-Copy `.env.example` to `.env` and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`. For booking/calendar integration via Zapier MCP, optionally set `MCP_SERVER_URL` (e.g. `https://mcp.zapier.com/api/v1/connect?token=YOUR_TOKEN`). Optionally:
+Copy `.env.example` to `.env` and set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`. For booking/calendar integration via Zapier MCP, optionally set `MCP_SERVER_URL` (e.g. `https://mcp.zapier.com/api/v1/connect?token=YOUR_TOKEN`). For conversation memory, optionally set `MEM0_API_KEY` (see [Mem0](https://app.mem0.ai)). Optionally:
 
 ```bash
 lk cloud auth
@@ -40,6 +40,44 @@ Download models (Silero VAD, turn detector) before first run:
 ```bash
 uv run python src/agents.py download-files
 ```
+
+---
+
+## Replaxy CLI
+
+After `uv sync`, the `replaxy` command is available for setup, credentials, validation, and run. **Do not modify internal source files**; use the CLI and config only.
+
+| Command | Description |
+|---------|-------------|
+| `replaxy init` | Create `replaxy.config.yaml` and `.env` template in the current directory. Use `--force` to overwrite existing config. |
+| `replaxy setup` | Interactive setup: enable LiveKit, Mem0, Zapier MCP; collect credentials and write them to `.env`; update config. Use `--force` to overwrite existing .env values. |
+| `replaxy validate` | Check config integrity and that enabled integrations have required env vars. Exits non-zero on failure. |
+| `replaxy run` | Load `.env` and config, run validation, then start the agent. Fails if validation fails. Use `--dev` for local LiveKit testing. |
+| `replaxy doctor` | Test connectivity for enabled integrations (LiveKit, Mem0, Zapier MCP). No secrets in output. |
+
+**Workflow**
+
+```bash
+replaxy init
+replaxy setup    # answer prompts; credentials stored in .env
+replaxy validate
+replaxy run      # or replaxy run --dev
+replaxy doctor   # optional: check integration health
+```
+
+All customization happens through the CLI, `replaxy.config.yaml`, and `.env`. Secrets stay in `.env` only.
+
+---
+
+## Configuration
+
+You can customize agents without changing code by using a **config file**. Secrets stay in `.env`; the config file holds only non-secret options (prompts, voices, which agents are enabled, and toggles for memory and MCP).
+
+1. Copy the example config: `cp config/agents.example.yaml config/agents.yaml` (or set `AGENTS_CONFIG_PATH` in `.env` to your file path).
+2. Edit `config/agents.yaml`:
+   - **session**: LLM model, STT model, default TTS, `default_timezone`, and flags `mcp_enabled` and `memory_enabled`. When `mcp_enabled` is false, MCP is not attached even if `MCP_SERVER_URL` is set in `.env`. When `memory_enabled` is false, Mem0 is not used even if `MEM0_API_KEY` is set.
+   - **agents**: List of agents. One must have `role: starter` and list specialist ids in `handoff_to` (e.g. `[booking, consultant]`). Each agent has `id`, `name`, `role`, `instructions`, `tts` (model + voice), and optionally `memory_enabled` / `mcp_enabled`. Specialists can use `agent_type: booking` (adds time tools and MCP-focused behavior) or `generic`. For booking instructions you can use placeholders `{appointment_topic}`, `{now_utc}`, `{default_timezone}`; for consultant use `{topic}`.
+3. Run the agent as usual. If no config file is found, built-in defaults are used (current hardcoded prompts and agents).
 
 ---
 

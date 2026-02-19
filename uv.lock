@@ -2672,6 +2672,9 @@ dependencies = [
     { name = "mcp" },
     { name = "mem0ai" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "typer" },
     { name = "tzdata" },
 ]
 
@@ -2692,7 +2695,10 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-asyncio", marker = "extra == 'dev'" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "rich" },
     { name = "ruff", marker = "extra == 'dev'" },
+    { name = "typer" },
     { name = "tzdata" },
 ]
 

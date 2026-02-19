@@ -20,6 +20,7 @@ class OrchestratorAgent(Agent):
     """
 
     def __init__(self, *args, **kwargs):
+        self._memory_enabled: bool = kwargs.pop("memory_enabled", True)
         super().__init__(*args, **kwargs)
         self._agent_start_time: Optional[datetime] = None
         self._agent_name: str = self.__class__.__name__
@@ -114,7 +115,7 @@ class OrchestratorAgent(Agent):
         self, turn_ctx: ChatContext, new_message: ChatMessage
     ) -> None:
         """Mem0: add user message, search memories, inject RAG context before LLM reply."""
-        if not mem0_client:
+        if not mem0_client or not self._memory_enabled:
             await super().on_user_turn_completed(turn_ctx, new_message)
             return
         session_context = self._get_session_context()

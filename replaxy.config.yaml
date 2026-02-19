@@ -1,0 +1,21 @@
+project:
+  name: replaxy-project
+  version: 0.1.0
+assistant:
+  name: Main Assistant
+  tone: professional
+  language: en
+roles: []
+memory:
+  enabled: false
+  type: null
+integrations:
+  livekit:
+    enabled: false
+  mem0:
+    enabled: false
+  zapier_mcp:
+    enabled: false
+handoff_rules:
+  mode: keyword
+  rules: []

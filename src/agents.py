@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
@@ -25,6 +25,8 @@ from livekit.agents.llm import ToolError, function_tool
 from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
+from config import load_config
+from config import AgentsConfig
 from orchestrator_agent import OrchestratorAgent
 
 logger = logging.getLogger("agent")
@@ -44,29 +46,48 @@ AGENT_NAME = "replaxy"
 class StarterAgent(OrchestratorAgent):
     def __init__(
         self,
+        config: Optional[AgentsConfig] = None,
         job_metadata: Optional[dict] = None,
         mem0_user_id: Optional[str] = None,
+        memory_enabled: bool = True,
     ) -> None:
+        self._config = config
         self._mem0_user_id = mem0_user_id
-        instructions = """You are the general manager's voice assistant. You support the GM with scheduling, consultant engagements, and other executive tasks. Only speak in English. Greet the user by introducing yourself as their assistant (e.g. "I'm your assistant").
+        if config:
+            starter = config.get_starter()
+            if not starter:
+                raise ValueError("Config has no starter agent")
+            instructions = starter.instructions.strip()
+            tts = inference.TTS(model=starter.tts.model, voice=starter.tts.voice)
+        else:
+            instructions = """You are the general manager's voice assistant. You support the GM with scheduling, consultant engagements, and other executive tasks. Only speak in English. Greet the user by introducing yourself as their assistant (e.g. "I'm your assistant").
             When the GM wants to book an event or meeting, call the tool call_booking_agent and say only the transfer message that the tool returns.
             When the GM needs to schedule consultant meetings or has questions about consultant engagements, call the tool call_consultant_agent and say only the transfer message that the tool returns.
             When you call call_booking_agent or call_consultant_agent, say only the transfer message. Do not add follow-up questions because you are leaving the conversation.
             Your responses are concise, professional, and without any complex formatting or punctuation including emojis, asterisks, or other symbols.
             You can use remembered context from past turns to personalize replies."""
+            tts = inference.TTS(
+                model="cartesia/sonic-3", voice="5ee9feff-1265-424a-9d7f-8e4d431a12c7"
+            )
         if job_metadata and job_metadata.get("user_name"):
             instructions += f"\nThe user's name is {job_metadata['user_name']}. Use it when appropriate."
         super().__init__(
             instructions=instructions,
-            tts=inference.TTS(
-                model="cartesia/sonic-3", voice="5ee9feff-1265-424a-9d7f-8e4d431a12c7"
-            ),
+            tts=tts,
+            memory_enabled=memory_enabled,
         )
 
     async def on_enter(self):
         if self._mem0_user_id is not None:
             self._update_session_context({"mem0_user_id": self._mem0_user_id})
         await super().on_enter()
+
+    def _handoff_to(self) -> list:
+        """Return list of specialist agent ids the starter can hand off to."""
+        if self._config:
+            starter = self._config.get_starter()
+            return list(starter.handoff_to) if starter else []
+        return ["booking", "consultant"]
 
     @function_tool
     async def call_consultant_agent(self, topic: str):
@@ -76,25 +97,26 @@ class StarterAgent(OrchestratorAgent):
         Args:
             topic: A description of the consultant-related request (e.g. scheduling a consultant meeting, questions about an engagement)
         """
-        # Validate handoff before proceeding
+        if self._config and "consultant" not in self._handoff_to():
+            return None, "I'm having trouble transferring you right now. Let me help you with that instead."
+        consultant_cfg = self._config.get_agent("consultant") if self._config else None
+        memory_enabled = self._config.session.memory_enabled if self._config else True
         if not self._validate_handoff("ConsultantAgent", {"topic": topic}):
             return None, "I'm having trouble transferring you right now. Let me help you with that instead."
-        
         try:
-            # Log exit before handoff
             await self.on_exit(reason="handoff")
-            
-            # Session will automatically manage chat context for the new agent
-            consultant_agent = ConsultantAgent(topic=topic)
-            
-            # Log the handoff
+            consultant_agent = ConsultantAgent(
+                topic=topic,
+                config=self._config,
+                agent_config=consultant_cfg,
+                memory_enabled=memory_enabled,
+            )
             self._log_handoff(
                 source_agent=self._agent_name,
                 target_agent="ConsultantAgent",
                 reason="consultant_request",
-                context_passed={"topic": topic}
+                context_passed={"topic": topic},
             )
-            
             return consultant_agent, f"Transferring you to your consultant liaison. They'll help you with: {topic}."
         except Exception as e:
             return self._handle_handoff_error(e, "ConsultantAgent")
@@ -107,77 +129,101 @@ class StarterAgent(OrchestratorAgent):
         Args:
             appointment_topic: A detailed description of the appointment type, date, time preferences, and any other relevant details
         """
-        # Validate handoff before proceeding
+        if self._config and "booking" not in self._handoff_to():
+            return None, "I'm having trouble transferring you right now. Let me help you with that booking instead."
+        booking_cfg = self._config.get_agent("booking") if self._config else None
+        memory_enabled = self._config.session.memory_enabled if self._config else True
+        default_tz = self._config.session.default_timezone if self._config else BOOKING_DEFAULT_TIMEZONE
         if not self._validate_handoff("BookingAgent", {"appointment_topic": appointment_topic}):
             return None, "I'm having trouble transferring you right now. Let me help you with that booking instead."
-        
         try:
-            # Log exit before handoff
             await self.on_exit(reason="handoff")
-            
-            # Session will automatically manage chat context for the new agent
-            booking_agent = BookingAgent(appointment_topic=appointment_topic)
-            
-            # Log the handoff
+            booking_agent = BookingAgent(
+                appointment_topic=appointment_topic,
+                config=self._config,
+                agent_config=booking_cfg,
+                default_timezone=default_tz,
+                memory_enabled=memory_enabled,
+            )
             self._log_handoff(
                 source_agent=self._agent_name,
                 target_agent="BookingAgent",
                 reason="appointment_booking",
-                context_passed={"appointment_topic": appointment_topic}
+                context_passed={"appointment_topic": appointment_topic},
             )
-            
             return booking_agent, f"Transferring you to your scheduling assistant. They'll help you with: {appointment_topic}."
         except Exception as e:
             return self._handle_handoff_error(e, "BookingAgent")
 
 
 class ConsultantAgent(OrchestratorAgent):
-    def __init__(self, topic: str) -> None:
-        super().__init__(
-            instructions=f"""You are the GM's consultant liaison. You help schedule consultant meetings and answer questions about consultant engagements. Only speak in English. Greet the user and state your role.
+    def __init__(
+        self,
+        topic: str,
+        config: Optional[AgentsConfig] = None,
+        agent_config: Optional[Any] = None,
+        memory_enabled: bool = True,
+    ) -> None:
+        if agent_config:
+            instructions = agent_config.instructions.strip().format(topic=topic)
+            tts = inference.TTS(model=agent_config.tts.model, voice=agent_config.tts.voice)
+        else:
+            instructions = f"""You are the GM's consultant liaison. You help schedule consultant meetings and answer questions about consultant engagements. Only speak in English. Greet the user and state your role.
             The user was transferred to you with the following request: {topic}. Acknowledge it naturally and help them (schedule a consultant meeting or answer engagement questions).
             When done, ask if they want to return to their main assistant. If yes, call the tool call_starter_agent to transfer them back. If not, end the conversation with the tool end_conversation.
             Your responses are concise, to the point, and without any complex formatting or punctuation including emojis, asterisks, or other symbols.
-            You can use remembered context from past turns to personalize replies.""",
-            # Consultant liaison voice
-            tts=inference.TTS(
+            You can use remembered context from past turns to personalize replies."""
+            tts = inference.TTS(
                 model="cartesia/sonic-3", voice="9626c31c-bec5-4cca-baa8-f8ba9e84c8bc"
-            ),
-        )
+            )
+        self._config = config  # None when using built-in defaults
+        super().__init__(instructions=instructions, tts=tts, memory_enabled=memory_enabled)
 
     @function_tool
     async def call_starter_agent(self):
         """
         Called when the GM wants to return to their main assistant.
         """
-        # Validate handoff before proceeding
         if not self._validate_handoff("StarterAgent"):
             return None, "I'm having trouble transferring you right now. How else can I help you?"
-        
         try:
-            # Log exit before handoff
             await self.on_exit(reason="handoff")
-            
-            # Session will automatically manage chat context for the new agent
-            starter_agent = StarterAgent()
-            
-            # Log the handoff
+            memory_enabled = self._config.session.memory_enabled if self._config else True
+            starter_agent = StarterAgent(
+                config=self._config,
+                memory_enabled=memory_enabled,
+            )
             self._log_handoff(
                 source_agent=self._agent_name,
                 target_agent="StarterAgent",
                 reason="return_to_starter",
-                context_passed={}
+                context_passed={},
             )
-            
             return starter_agent, "Transferring you back to your assistant."
         except Exception as e:
             return self._handle_handoff_error(e, "StarterAgent")
 
 
 class BookingAgent(OrchestratorAgent):
-    def __init__(self, appointment_topic: str) -> None:
+    def __init__(
+        self,
+        appointment_topic: str,
+        config: Optional[AgentsConfig] = None,
+        agent_config: Optional[Any] = None,
+        default_timezone: Optional[str] = None,
+        memory_enabled: bool = True,
+    ) -> None:
         now_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        instructions = f"""You are the GM's scheduling assistant. You manage the GM's calendar and events. Only speak in English.
+        tz = default_timezone or BOOKING_DEFAULT_TIMEZONE
+        if agent_config:
+            instructions = agent_config.instructions.strip().format(
+                appointment_topic=appointment_topic,
+                now_utc=now_utc,
+                default_timezone=tz,
+            )
+            tts = inference.TTS(model=agent_config.tts.model, voice=agent_config.tts.voice)
+        else:
+            instructions = f"""You are the GM's scheduling assistant. You manage the GM's calendar and events. Only speak in English.
             Greet the user and state your role. The topic of the booking is {appointment_topic}. Acknowledge this topic naturally when greeting the user.
 
             Current date and time (UTC): {now_utc}. Use this when the user says "today", "tomorrow", "yesterday", or "next week".
@@ -193,7 +239,7 @@ class BookingAgent(OrchestratorAgent):
             Before creating any appointment, you must check availability for the requested date and time using MCP tools (e.g. list events in that time range or get free/busy). If the check shows the slot is already occupied, do not create an event; tell the user the slot is occupied and use MCP tools to find another free slot the same day and suggest it. Only when the availability check shows the slot is free should you call the MCP tool that creates the event. Never call only a "create event" or "quick add" tool without checking availability first.
 
             When calling MCP tools that create a calendar event, always specify the timezone for the event (e.g. via a timezone parameter if the tool has one, or by passing start and end in ISO 8601 with offset, e.g. 2026-02-01T15:00:00+02:00 for 3 PM in Israel). Do not send naive times like 2026-02-01T15:00:00 without timezone or offset.
-            """ + (f" When the user does not specify a timezone, use {BOOKING_DEFAULT_TIMEZONE} for creating events." if BOOKING_DEFAULT_TIMEZONE else " If the user has not specified a timezone, use a sensible default (e.g. Asia/Jerusalem if the user is in Israel) or ask the user which timezone to use.") + """ You can use the get_current_time or convert_time tools to resolve times like "3 PM" in the user's timezone to an ISO time with offset before passing to the create tool.
+            """ + (f" When the user does not specify a timezone, use {tz} for creating events." if tz else " If the user has not specified a timezone, use a sensible default (e.g. Asia/Jerusalem if the user is in Israel) or ask the user which timezone to use.") + """ You can use the get_current_time or convert_time tools to resolve times like "3 PM" in the user's timezone to an ISO time with offset before passing to the create tool.
 
             You have access to MCP tools from the connected server. Use them whenever the user asks to check or book appointments. Call the appropriate tool with the parameters the user provides (name, date, time, reason, etc.), then summarize the result in short, clear speech.
 
@@ -204,14 +250,11 @@ class BookingAgent(OrchestratorAgent):
             Your responses are concise, to the point, and without any complex formatting or punctuation including emojis, asterisks, or other symbols.
             Keep responses brief and natural for voice: one or two sentences when possible. Confirm what you did (e.g. "I've booked you for Tuesday at 3 PM") and ask if they need anything else.
             You can use remembered context from past turns to personalize replies."""
-        super().__init__(
-            instructions=instructions,
-            # GM scheduling assistant voice
-            # To find available voices, check the LiveKit TTS documentation or Cartesia's voice list
-            tts=inference.TTS(
-                model="cartesia/sonic-3", voice="79f8b5fb-2cc8-479a-80df-29f7a7cf1a3e"  # Verify this is a masculine voice
-            ),
-        )
+            tts = inference.TTS(
+                model="cartesia/sonic-3", voice="79f8b5fb-2cc8-479a-80df-29f7a7cf1a3e"
+            )
+        self._config = config  # None when using built-in defaults
+        super().__init__(instructions=instructions, tts=tts, memory_enabled=memory_enabled)
 
     @function_tool
     async def get_current_time(self, timezone_name: str) -> str:
@@ -268,25 +311,18 @@ class BookingAgent(OrchestratorAgent):
         """
         Called when the GM wants to return to their main assistant.
         """
-        # Validate handoff before proceeding
         if not self._validate_handoff("StarterAgent"):
             return None, "I'm having trouble transferring you right now. How else can I help you?"
-        
         try:
-            # Log exit before handoff
             await self.on_exit(reason="handoff")
-            
-            # Session will automatically manage chat context for the new agent
-            starter_agent = StarterAgent()
-            
-            # Log the handoff
+            memory_enabled = self._config.session.memory_enabled if self._config else True
+            starter_agent = StarterAgent(config=self._config, memory_enabled=memory_enabled)
             self._log_handoff(
                 source_agent=self._agent_name,
                 target_agent="StarterAgent",
                 reason="return_to_starter",
-                context_passed={}
+                context_passed={},
             )
-            
             return starter_agent, "Transferring you back to your assistant."
         except Exception as e:
             return self._handle_handoff_error(e, "StarterAgent")
@@ -313,71 +349,82 @@ async def my_agent(ctx: JobContext):
         except json.JSONDecodeError:
             pass
 
-    # Logging setup
     ctx.log_context_fields = {
         "room": ctx.room.name,
         **({"job_metadata": job_metadata} if job_metadata else {}),
     }
 
-    # Set up a voice AI pipeline using OpenAI, Cartesia, AssemblyAI, and the LiveKit turn detector
-    session_kwargs = {
-        # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
-        # See all available models at https://docs.livekit.io/agents/models/stt/
-        "stt": inference.STT(model="assemblyai/universal-streaming", language="en"),
-        # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
-        # See all available models at https://docs.livekit.io/agents/models/llm/
-        "llm": inference.LLM(model="openai/gpt-4.1-mini"),
-        # Text-to-speech (TTS) is your agent's voice, turning the LLM's text into speech that the user can hear
-        # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
-        "tts": inference.TTS(
-            model="cartesia/sonic-3", voice="87286a8d-7ea7-4235-a41a-dd9fa6630feb"
-        ),
-        # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
-        # See more at https://docs.livekit.io/agents/build/turns
-        "turn_detection": MultilingualModel(),
-        "vad": ctx.proc.userdata["vad"],
-        # allow the LLM to generate a response while waiting for the end of turn
-        # See more at https://docs.livekit.io/agents/build/audio/#preemptive-generation
-        "preemptive_generation": True,
-    }
-    
-    # Add MCP servers if MCP_SERVER_URL is configured
-    # Zapier MCP uses streamable HTTP; auto-detect would default to SSE and fail.
-    if MCP_SERVER_URL:
-        session_kwargs["mcp_servers"] = [
-            mcp.MCPServerHTTP(
-                url=MCP_SERVER_URL,
-                transport_type="streamable_http",
-                client_session_timeout_seconds=60,
+    cfg = load_config()
+    if cfg:
+        session_cfg = cfg.session
+        session_kwargs = {
+            "stt": inference.STT(
+                model=session_cfg.stt_model,
+                language=session_cfg.stt_language,
             ),
-        ]
-        logger.info("MCP integration enabled (Zapier)")
+            "llm": inference.LLM(model=session_cfg.llm_model),
+            "tts": inference.TTS(
+                model=session_cfg.default_tts.model,
+                voice=session_cfg.default_tts.voice,
+            ),
+            "turn_detection": MultilingualModel(),
+            "vad": ctx.proc.userdata["vad"],
+            "preemptive_generation": True,
+        }
+        if session_cfg.mcp_enabled and MCP_SERVER_URL:
+            session_kwargs["mcp_servers"] = [
+                mcp.MCPServerHTTP(
+                    url=MCP_SERVER_URL,
+                    transport_type="streamable_http",
+                    client_session_timeout_seconds=60,
+                ),
+            ]
+            logger.info("MCP integration enabled (Zapier)")
+        else:
+            if not session_cfg.mcp_enabled:
+                logger.info("MCP disabled by config (session.mcp_enabled: false)")
+            else:
+                logger.info("MCP integration disabled (MCP_SERVER_URL not set)")
     else:
-        logger.info("MCP integration disabled (MCP_SERVER_URL not set)")
-    
+        session_kwargs = {
+            "stt": inference.STT(model="assemblyai/universal-streaming", language="en"),
+            "llm": inference.LLM(model="openai/gpt-4.1-mini"),
+            "tts": inference.TTS(
+                model="cartesia/sonic-3", voice="87286a8d-7ea7-4235-a41a-dd9fa6630feb"
+            ),
+            "turn_detection": MultilingualModel(),
+            "vad": ctx.proc.userdata["vad"],
+            "preemptive_generation": True,
+        }
+        if MCP_SERVER_URL:
+            session_kwargs["mcp_servers"] = [
+                mcp.MCPServerHTTP(
+                    url=MCP_SERVER_URL,
+                    transport_type="streamable_http",
+                    client_session_timeout_seconds=60,
+                ),
+            ]
+            logger.info("MCP integration enabled (Zapier)")
+        else:
+            logger.info("MCP integration disabled (MCP_SERVER_URL not set)")
+
     session = AgentSession(**session_kwargs)
 
-    # To use a realtime model instead of a voice pipeline, use the following session setup instead.
-    # (Note: This is for the OpenAI Realtime API. For other providers, see https://docs.livekit.io/agents/models/realtime/))
-    # 1. Install livekit-agents[openai]
-    # 2. Set OPENAI_API_KEY in .env.local
-    # 3. Add `from livekit.plugins import openai` to the top of this file
-    # 4. Use the following session setup instead of the version above
-    # session = AgentSession(
-    #     llm=openai.realtime.RealtimeModel(voice="marin")
-    # )
-
-    # # Add a virtual avatar to the session, if desired
-    # # For other providers, see https://docs.livekit.io/agents/models/avatar/
-    # avatar = hedra.AvatarSession(
-    #   avatar_id="...",  # See https://docs.livekit.io/agents/models/avatar/plugins/hedra
-    # )
-    # # Start the avatar and wait for it to join
-    # await avatar.start(session, room=ctx.room)
-
     mem0_user_id = (job_metadata or {}).get("user_id") or (job_metadata or {}).get("user_name") or ctx.room.name
+    if cfg:
+        entry_agent = StarterAgent(
+            config=cfg,
+            job_metadata=job_metadata or None,
+            mem0_user_id=mem0_user_id,
+            memory_enabled=cfg.session.memory_enabled,
+        )
+    else:
+        entry_agent = StarterAgent(
+            job_metadata=job_metadata or None,
+            mem0_user_id=mem0_user_id,
+        )
     await session.start(
-        agent=StarterAgent(job_metadata=job_metadata or None, mem0_user_id=mem0_user_id),
+        agent=entry_agent,
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -388,7 +435,6 @@ async def my_agent(ctx: JobContext):
         ),
     )
 
-    # Join the room and connect to the user
     await ctx.connect()
 
 

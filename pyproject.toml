@@ -10,8 +10,14 @@ dependencies = [
     "mcp",
     "mem0ai",
     "python-dotenv",
+    "pyyaml",
+    "rich",
+    "typer",
     "tzdata",
 ]
+
+[project.scripts]
+replaxy = "src.cli:app"
 
 [project.optional-dependencies]
 dev = [
