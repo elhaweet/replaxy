@@ -67,8 +67,8 @@ def env_exists(path: Optional[Path] = None) -> bool:
 
 
 # Template for new .env (commented placeholders only)
-ENV_TEMPLATE = """# Replaxy – credentials (do not commit secrets)
-# Run: replaxy setup
+ENV_TEMPLATE = """# LiveKit Multi-Agent Voice – credentials (do not commit secrets)
+# Run: lk-mav setup
 
 # LiveKit (required for voice agent)
 # LIVEKIT_URL=

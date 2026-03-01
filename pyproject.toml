@@ -1,5 +1,5 @@
 [project]
-name = "replaxy"
+name = "livekit-multi-agent-voice"
 version = "1.0.0"
 requires-python = ">=3.10"
 
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-replaxy = "src.cli:app"
+lk-mav = "src.cli:app"
 
 [project.optional-dependencies]
 dev = [

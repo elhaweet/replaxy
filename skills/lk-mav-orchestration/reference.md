@@ -1,4 +1,4 @@
-# Replaxy — Reference
+# LK-MAV — Reference
 
 ## Config Dataclasses (`src/config.py`)
 
@@ -100,11 +100,11 @@ agents:
 
 ---
 
-## replaxy.config.yaml Schema (CLI-level)
+## lk-mav.config.yaml Schema (CLI-level)
 
 ```yaml
 project:
-  name: replaxy-project
+  name: lk-mav-project
   version: 0.1.0
 
 assistant:
@@ -208,8 +208,8 @@ await mem0_client.search(
 Available on every subcommand as a direct parameter. Pass it to `_ui(no_color)` — do NOT use the global callback pattern. Both positions work:
 
 ```bash
-replaxy --no-color doctor     # global (callback)
-replaxy doctor --no-color     # per-command parameter
+lk-mav --no-color doctor     # global (callback)
+lk-mav doctor --no-color     # per-command parameter
 ```
 
 ---
@@ -235,5 +235,5 @@ Requires `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` in `.env`.
 | Mem0 search 400 error | Missing `filters` dict | Use `filters={"AND": [{"user_id": ...}]}` |
 | Agent handoff loops | Circular `handoff_to` or missing `call_starter_agent` | Check `handoff_to` lists; ensure specialist calls `call_starter_agent` |
 | `--no-color` rejected | Used as subcommand option before the fix | Flag is now on each subcommand — pass after subcommand name |
-| `replaxy run` fails validation | Enabled integration missing env var | Run `replaxy setup` or manually fill `.env` |
+| `lk-mav run` fails validation | Enabled integration missing env var | Run `lk-mav setup` or manually fill `.env` |
 | Context lost across handoffs | `session.userdata` not set (console mode) | Falls back to `self._session_context` automatically |

@@ -1,5 +1,5 @@
 """
-Centralized UI rendering for the Replaxy CLI.
+Centralized UI rendering for the LK-MAV CLI.
 
 All styled output goes through this module. No inline print styling elsewhere.
 Supports --no-color mode for CI environments.
@@ -24,23 +24,23 @@ DIM       = "grey42"
 ACCENT    = "cyan"
 
 VERSION = "1.0.0"
-TAGLINE = "Executive Voice Orchestration Framework"
+TAGLINE = "LiveKit Multi-Agent Voice"
 
 # ── ASCII logo ────────────────────────────────────────────────────────────────
 LOGO = r"""
-  ██████╗ ███████╗██████╗ ██╗      █████╗ ██╗  ██╗██╗   ██╗
-  ██╔══██╗██╔════╝██╔══██╗██║     ██╔══██╗╚██╗██╔╝╚██╗ ██╔╝
-  ██████╔╝█████╗  ██████╔╝██║     ███████║ ╚███╔╝  ╚████╔╝
-  ██╔══██╗██╔══╝  ██╔═══╝ ██║     ██╔══██║ ██╔██╗   ╚██╔╝
-  ██║  ██║███████╗██║     ███████╗██║  ██║██╔╝ ██╗   ██║
-  ╚═╝  ╚═╝╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
+  ██╗     ██╗██╗  ██╗    ███╗   ███╗ █████╗ ██╗   ██╗
+  ██║     ██║██║ ██╔╝    ████╗ ████║██╔══██╗██║   ██║
+  ██║     ██║█████╔╝     ██╔████╔██║███████║██║   ██║
+  ██║     ██║██╔═██╗     ██║╚██╔╝██║██╔══██║╚██╗ ██╔╝
+  ███████╗██║██║  ██╗    ██║ ╚═╝ ██║██║  ██║ ╚████╔╝
+  ╚══════╝╚═╝╚═╝  ╚═╝    ╚═╝     ╚═╝╚═╝  ╚═╝  ╚═══╝
 """
 
-LOGO_COMPACT = r"""  Replaxy"""
+LOGO_COMPACT = r"""  LK-MAV"""
 
 
 class UI:
-    """All styled output for the Replaxy CLI. Instantiate with no_color=True to strip ANSI."""
+    """All styled output for the LK-MAV CLI. Instantiate with no_color=True to strip ANSI."""
 
     def __init__(self, no_color: bool = False) -> None:
         self.no_color = no_color
@@ -53,7 +53,7 @@ class UI:
         if compact:
             self.console.print()
             self.console.print(
-                f"  [bold {PRIMARY}]Replaxy[/] [bold]v{VERSION}[/]  [{DIM}]{TAGLINE}[/]"
+                f"  [bold {PRIMARY}]LK-MAV[/] [bold]v{VERSION}[/]  [{DIM}]{TAGLINE}[/]"
             )
             self.console.print()
             return
@@ -61,7 +61,7 @@ class UI:
         logo_text = Text(LOGO, style=f"bold {PRIMARY}")
         self.console.print(logo_text)
         version_line = Text()
-        version_line.append(f"  Replaxy v{VERSION}", style=f"bold {PRIMARY}")
+        version_line.append(f"  LK-MAV v{VERSION}", style=f"bold {PRIMARY}")
         version_line.append(f"  –  {TAGLINE}", style=DIM)
         self.console.print(version_line)
         self.console.print()
@@ -199,11 +199,11 @@ class UI:
         """Show the launch banner before starting the agent subprocess."""
         label = "dev" if mode == "dev" else "production"
         if self.no_color:
-            self.console.print(f"\nStarting Replaxy agent [{label}]...\n")
+            self.console.print(f"\nStarting LK-MAV agent [{label}]...\n")
         else:
             self.console.print(
                 Panel(
-                    f"  [{PRIMARY}]Starting Replaxy agent[/]  [{DIM}][{label}][/]",
+                    f"  [{PRIMARY}]Starting LK-MAV agent[/]  [{DIM}][{label}][/]",
                     border_style=ACCENT,
                     padding=(0, 2),
                 )

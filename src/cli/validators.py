@@ -1,5 +1,5 @@
 """
-Validate replaxy.config.yaml and .env for enabled integrations.
+Validate lk-mav.config.yaml and .env for enabled integrations.
 Structured errors; no secrets in messages.
 """
 from pathlib import Path
@@ -66,7 +66,7 @@ def validate_integration_env(
                 value = (env.get(var) or "").strip()
                 if not value:
                     errors.append(
-                        f"{key.replace('_', ' ').title()} enabled but {var} missing or empty. Run: replaxy setup"
+                        f"{key.replace('_', ' ').title()} enabled but {var} missing or empty. Run: lk-mav setup"
                     )
     return errors
 
@@ -81,7 +81,7 @@ def validate_all(
     """
     errors: List[str] = []
     if not config_exists(config_path_override):
-        errors.append("replaxy.config.yaml not found. Run: replaxy init")
+        errors.append("lk-mav.config.yaml not found. Run: lk-mav init")
         return False, errors
     try:
         data = load_config(config_path_override)

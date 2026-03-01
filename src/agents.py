@@ -40,7 +40,7 @@ BOOKING_DEFAULT_TIMEZONE = (os.environ.get("BOOKING_DEFAULT_TIMEZONE") or "UTC")
 
 # Agent name for explicit dispatch. When set, automatic dispatch is disabled;
 # the agent must be explicitly dispatched via API, CLI, token, or SIP.
-AGENT_NAME = "replaxy"
+AGENT_NAME = "lk-mav"
 
 
 class StarterAgent(OrchestratorAgent):

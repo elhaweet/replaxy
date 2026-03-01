@@ -1,5 +1,5 @@
 """
-Replaxy CLI – setup, credentials, validation, run.
+LiveKit Multi-Agent Voice (LK-MAV) CLI – setup, credentials, validation, run.
 All output goes through src/cli/ui.py. No inline styling here.
 """
 import subprocess
@@ -23,8 +23,8 @@ from .validators import validate_all
 # ── App definition ────────────────────────────────────────────────────────────
 
 app = typer.Typer(
-    name="replaxy",
-    help="Executive Voice Orchestration Framework.",
+    name="lk-mav",
+    help="LiveKit Multi-Agent Voice – config-driven voice agent orchestration.",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -42,7 +42,7 @@ _NO_COLOR_OPTION = typer.Option(False, "--no-color", help="Disable colors and em
 
 @app.callback()
 def main() -> None:
-    """Executive Voice Orchestration Framework."""
+    """LiveKit Multi-Agent Voice – config-driven voice agent orchestration."""
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ def _url_ok(s: str) -> bool:
     return s.startswith("http://") or s.startswith("https://")
 
 
-# ── replaxy init ──────────────────────────────────────────────────────────────
+# ── lk-mav init ──────────────────────────────────────────────────────────────
 
 
 @app.command()
@@ -81,7 +81,7 @@ def init(
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config."),
     no_color: bool = _NO_COLOR_OPTION,
 ) -> None:
-    """Initialize a new Replaxy project (creates replaxy.config.yaml and .env template)."""
+    """Initialize a new LK-MAV project (creates lk-mav.config.yaml and .env template)."""
     ui = _ui(no_color)
     ui.logo()
     ui.section("Initialize Project")
@@ -91,8 +91,8 @@ def init(
 
     if cfg_p.exists() and not force:
         ui.error(
-            "replaxy.config.yaml already exists.",
-            action="Use --force to overwrite: replaxy init --force",
+            "lk-mav.config.yaml already exists.",
+            action="Use --force to overwrite: lk-mav init --force",
         )
         raise typer.Exit(1)
 
@@ -106,11 +106,11 @@ def init(
         ui.dim(f"{env_p.name} already exists — skipping.")
 
     ui.console.print()
-    ui.info("Next step:  replaxy setup")
+    ui.info("Next step:  lk-mav setup")
     ui.console.print()
 
 
-# ── replaxy setup ─────────────────────────────────────────────────────────────
+# ── lk-mav setup ─────────────────────────────────────────────────────────────
 
 
 @app.command()
@@ -128,7 +128,7 @@ def setup(
     env_p = env_path(cwd)
 
     if not config_exists(cfg_p):
-        ui.error("replaxy.config.yaml not found.", action="Run: replaxy init")
+        ui.error("lk-mav.config.yaml not found.", action="Run: lk-mav init")
         raise typer.Exit(1)
 
     data = load_config(cfg_p)
@@ -205,18 +205,18 @@ def setup(
     save_config(data, cfg_p)
     ui.console.print()
     ui.setup_complete(configured)
-    ui.info("Next step:  replaxy validate")
+    ui.info("Next step:  lk-mav validate")
     ui.console.print()
 
 
-# ── replaxy validate ──────────────────────────────────────────────────────────
+# ── lk-mav validate ──────────────────────────────────────────────────────────
 
 
 @app.command()
 def validate(
     no_color: bool = _NO_COLOR_OPTION,
 ) -> None:
-    """Check replaxy.config.yaml integrity and .env completeness for enabled integrations."""
+    """Check lk-mav.config.yaml integrity and .env completeness for enabled integrations."""
     ui = _ui(no_color)
     ui.logo(compact=True)
     ui.section("Configuration Validation")
@@ -226,12 +226,12 @@ def validate(
         ui.validation_ok()
     else:
         ui.error_list(errors)
-        ui.dim("Run: replaxy setup")
+        ui.dim("Run: lk-mav setup")
         ui.console.print()
         raise typer.Exit(1)
 
 
-# ── replaxy run ───────────────────────────────────────────────────────────────
+# ── lk-mav run ───────────────────────────────────────────────────────────────
 
 
 @app.command()
@@ -239,7 +239,7 @@ def run(
     dev: bool = typer.Option(False, "--dev", "-d", help="Run in dev mode (local LiveKit testing)."),
     no_color: bool = _NO_COLOR_OPTION,
 ) -> None:
-    """Validate configuration, then start the Replaxy agent. Hard-stops on any error."""
+    """Validate configuration, then start the LK-MAV agent. Hard-stops on any error."""
     ui = _ui(no_color)
     ui.logo(compact=True)
     ui.section("Pre-flight Checks")
@@ -249,20 +249,20 @@ def run(
     cfg_p = config_path(cwd)
 
     if not env_p.exists():
-        ui.error(".env not found.", action="Run: replaxy init")
+        ui.error(".env not found.", action="Run: lk-mav init")
         raise typer.Exit(1)
 
     from dotenv import load_dotenv
     load_dotenv(env_p)
 
     if not config_exists(cfg_p):
-        ui.error("replaxy.config.yaml not found.", action="Run: replaxy init")
+        ui.error("lk-mav.config.yaml not found.", action="Run: lk-mav init")
         raise typer.Exit(1)
 
     ok, errors = validate_all(cfg_p, env_p)
     if not ok:
         ui.error_list(errors)
-        ui.dim("Run: replaxy setup")
+        ui.dim("Run: lk-mav setup")
         ui.console.print()
         raise typer.Exit(1)
 
@@ -281,7 +281,7 @@ def run(
         raise typer.Exit(1)
 
 
-# ── replaxy doctor ────────────────────────────────────────────────────────────
+# ── lk-mav doctor ────────────────────────────────────────────────────────────
 
 
 def _check_livekit(env: dict) -> tuple[str, str, str]:
@@ -344,7 +344,7 @@ def doctor(
     ui.section("Integration Health Check")
 
     if not config_exists(config_path(_cwd())):
-        ui.error("replaxy.config.yaml not found.", action="Run: replaxy init")
+        ui.error("lk-mav.config.yaml not found.", action="Run: lk-mav init")
         raise typer.Exit(1)
 
     data = load_config(config_path(_cwd()))
@@ -366,14 +366,14 @@ def doctor(
 
     if not results:
         ui.warning("No integrations enabled.")
-        ui.info("Run: replaxy setup")
+        ui.info("Run: lk-mav setup")
         ui.console.print()
         return
 
     ui.doctor_table(results)
     any_fail = any(s == "fail" for _, s, _ in results)
     if any_fail:
-        ui.dim("Some checks failed. Run: replaxy setup to update credentials.")
+        ui.dim("Some checks failed. Run: lk-mav setup to update credentials.")
     else:
         ui.success("All integrations are healthy.")
     ui.console.print()

@@ -1,16 +1,16 @@
 """
-Load and save replaxy.config.yaml. No secrets in this file.
+Load and save lk-mav.config.yaml. No secrets in this file.
 """
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
 
-DEFAULT_CONFIG_PATH = Path("replaxy.config.yaml")
+DEFAULT_CONFIG_PATH = Path("lk-mav.config.yaml")
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "project": {
-        "name": "replaxy-project",
+        "name": "lk-mav-project",
         "version": "0.1.0",
     },
     "assistant": {
@@ -41,19 +41,19 @@ def config_path(cwd: Optional[Path] = None) -> Path:
 
 
 def load_config(path: Optional[Path] = None) -> Dict[str, Any]:
-    """Load replaxy.config.yaml. Raises FileNotFoundError if missing."""
+    """Load lk-mav.config.yaml. Raises FileNotFoundError if missing."""
     p = path or config_path()
     if not p.exists():
-        raise FileNotFoundError(f"Config not found: {p}. Run: replaxy init")
+        raise FileNotFoundError(f"Config not found: {p}. Run: lk-mav init")
     with open(p, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
-        raise ValueError("replaxy.config.yaml must be a YAML object")
+        raise ValueError("lk-mav.config.yaml must be a YAML object")
     return data
 
 
 def save_config(data: Dict[str, Any], path: Optional[Path] = None) -> None:
-    """Write replaxy.config.yaml."""
+    """Write lk-mav.config.yaml."""
     p = path or config_path()
     with open(p, "w", encoding="utf-8") as f:
         yaml.safe_dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)

@@ -1,10 +1,10 @@
-# Replaxy
+# LiveKit Multi-Agent Voice (LK-MAV)
 
-Multi-agent voice AI built with [LiveKit Agents](https://github.com/livekit/agents). **Tom** (starter) hands off to **Sarah** (support) or **James** (booking); both can return to Tom or end the call. The `replaxy` agent uses **explicit dispatch** — it must be dispatched to a room (CLI, API, token, or SIP) and does not auto-join by room name.
+Multi-agent voice AI built with [LiveKit Agents](https://github.com/livekit/agents). **Tom** (starter) hands off to **Sarah** (support) or **James** (booking); both can return to Tom or end the call. The `lk-mav` agent uses **explicit dispatch** — it must be dispatched to a room (CLI, API, token, or SIP) and does not auto-join by room name.
 
 ## Tutorial
 
-[![Replaxy Tutorial](https://img.youtube.com/vi/3FnatxfYt_k/maxresdefault.jpg)](https://youtu.be/3FnatxfYt_k)
+[![LK-MAV Tutorial](https://img.youtube.com/vi/3FnatxfYt_k/maxresdefault.jpg)](https://youtu.be/3FnatxfYt_k)
 
 ---
 
@@ -43,29 +43,29 @@ uv run python src/agents.py download-files
 
 ---
 
-## Replaxy CLI
+## LK-MAV CLI
 
-After `uv sync`, the `replaxy` command is available for setup, credentials, validation, and run. **Do not modify internal source files**; use the CLI and config only.
+After `uv sync`, the `lk-mav` command is available for setup, credentials, validation, and run. **Do not modify internal source files**; use the CLI and config only.
 
 | Command | Description |
 |---------|-------------|
-| `replaxy init` | Create `replaxy.config.yaml` and `.env` template in the current directory. Use `--force` to overwrite existing config. |
-| `replaxy setup` | Interactive setup: enable LiveKit, Mem0, Zapier MCP; collect credentials and write them to `.env`; update config. Use `--force` to overwrite existing .env values. |
-| `replaxy validate` | Check config integrity and that enabled integrations have required env vars. Exits non-zero on failure. |
-| `replaxy run` | Load `.env` and config, run validation, then start the agent. Fails if validation fails. Use `--dev` for local LiveKit testing. |
-| `replaxy doctor` | Test connectivity for enabled integrations (LiveKit, Mem0, Zapier MCP). No secrets in output. |
+| `lk-mav init` | Create `lk-mav.config.yaml` and `.env` template in the current directory. Use `--force` to overwrite existing config. |
+| `lk-mav setup` | Interactive setup: enable LiveKit, Mem0, Zapier MCP; collect credentials and write them to `.env`; update config. Use `--force` to overwrite existing .env values. |
+| `lk-mav validate` | Check config integrity and that enabled integrations have required env vars. Exits non-zero on failure. |
+| `lk-mav run` | Load `.env` and config, run validation, then start the agent. Fails if validation fails. Use `--dev` for local LiveKit testing. |
+| `lk-mav doctor` | Test connectivity for enabled integrations (LiveKit, Mem0, Zapier MCP). No secrets in output. |
 
 **Workflow**
 
 ```bash
-replaxy init
-replaxy setup    # answer prompts; credentials stored in .env
-replaxy validate
-replaxy run      # or replaxy run --dev
-replaxy doctor   # optional: check integration health
+lk-mav init
+lk-mav setup    # answer prompts; credentials stored in .env
+lk-mav validate
+lk-mav run      # or lk-mav run --dev
+lk-mav doctor   # optional: check integration health
 ```
 
-All customization happens through the CLI, `replaxy.config.yaml`, and `.env`. Secrets stay in `.env` only.
+All customization happens through the CLI, `lk-mav.config.yaml`, and `.env`. Secrets stay in `.env` only.
 
 ---
 
@@ -94,12 +94,12 @@ You can customize agents without changing code by using a **config file**. Secre
 
 ### Dispatch — `uv run python scripts/dispatch_agent.py`
 
-Dispatches `replaxy` to a room via the Agent Dispatch API. Requires `LIVEKIT_*` in `.env`.
+Dispatches `lk-mav` to a room via the Agent Dispatch API. Requires `LIVEKIT_*` in `.env`.
 
 | Option | Description |
 |--------|-------------|
 | `-r`, `--room` | Room name (required). Created if missing. |
-| `-a`, `--agent-name` | Agent name (default: `replaxy`). |
+| `-a`, `--agent-name` | Agent name (default: `lk-mav`). |
 | `-m`, `--metadata` | JSON string for `ctx.job.metadata`, e.g. `'{"user_name":"Alice"}'`. |
 | `-l`, `--list` | After creating, list dispatches in the room. |
 | `--no-create` | Only list dispatches; do not create one. |
@@ -142,7 +142,7 @@ uv run python scripts/dispatch_agent.py -r my-room --no-create
 
 | Command | Description |
 |---------|-------------|
-| `lk dispatch create --agent-name replaxy --room ROOM [--metadata '{}']` | Dispatch `replaxy` to a room. |
+| `lk dispatch create --agent-name lk-mav --room ROOM [--metadata '{}']` | Dispatch `lk-mav` to a room. |
 
 ---
 
@@ -150,10 +150,10 @@ uv run python scripts/dispatch_agent.py -r my-room --no-create
 
 Because dispatch is explicit, connect only **after** dispatching:
 
-1. **Dispatch**: `lk dispatch create --agent-name replaxy --room my-room` or `uv run python scripts/dispatch_agent.py -r my-room`
+1. **Dispatch**: `lk dispatch create --agent-name lk-mav --room my-room` or `uv run python scripts/dispatch_agent.py -r my-room`
 2. **Connect**: [Agents Playground](https://agents-playground.livekit.io/) or your frontend — join the same room.
 
-For token-based dispatch, use `RoomAgentDispatch` with `agent_name="replaxy"` in `RoomConfiguration`. For SIP, use [SIP dispatch rules](https://docs.livekit.io/telephony/accepting-calls/dispatch-rule/).
+For token-based dispatch, use `RoomAgentDispatch` with `agent_name="lk-mav"` in `RoomConfiguration`. For SIP, use [SIP dispatch rules](https://docs.livekit.io/telephony/accepting-calls/dispatch-rule/).
 
 ---
 

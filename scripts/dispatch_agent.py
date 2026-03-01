@@ -1,5 +1,5 @@
 """
-Explicitly dispatch the replaxy agent to a room via the AgentDispatchService API.
+Explicitly dispatch the LK-MAV agent to a room via the AgentDispatchService API.
 
 Use this when the agent is configured with agent_name (explicit dispatch):
 the agent will NOT join rooms automatically and must be explicitly dispatched.
@@ -9,7 +9,7 @@ Requires LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET in .env or the environ
 Usage:
   uv run python scripts/dispatch_agent.py --room my-room
   uv run python scripts/dispatch_agent.py --room my-room --metadata '{"user_name": "Alice"}'
-  uv run python scripts/dispatch_agent.py --room my-room --agent-name replaxy --list
+  uv run python scripts/dispatch_agent.py --room my-room --agent-name lk-mav --list
 """
 
 import argparse
@@ -22,7 +22,7 @@ from livekit import api
 load_dotenv(".env")
 load_dotenv(".env.local")
 
-DEFAULT_AGENT_NAME = "replaxy"
+DEFAULT_AGENT_NAME = "lk-mav"
 
 
 async def main() -> None:
